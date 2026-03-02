@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>孩子詞彙覆習程式</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        select, button, input, label {
+            font-size: 20px;
+            padding: 10px;
+            margin: 10px;
+        }
+        #wordDisplay {
+            font-size: 60px; /* 增大字體，讓孩子容易辨認 */
+            margin: 20px 0;
+            color: #007bff;
+        }
+        #reviewSection {
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* 讓內容居中 */
+        }
+        #buttons {
+            display: flex;
+            justify-content: center; /* 按鈕居中 */
+            gap: 20px; /* 按鈕之間的間距 */
+        }
+        #hintButton, #correctButton, #wrongButton {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #wrongButton {
+            background-color: #dc3545; /* 紅色表示錯誤 */
+        }
+        #hintButton:hover, #correctButton:hover {
+            background-color: #218838;
+        }
+        #wrongButton:hover {
+            background-color: #c82333;
+        }
+        #status {
+            font-size: 18px;
+            color: #555;
+            margin-top: 10px;
+        }
+        #multiThemeSelection {
+            display: none;
+        }
+        #multiThemeSelection label {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>孩子詞彙覆習程式</h1>
+    <div id="selectionSection">
+        <p>請選擇覆習模式：</p>
+        <select id="modeSelect">
+            <option value="">-- 選擇模式 --</option>
+            <option value="single">單主題覆習</option>
+            <option value="multi">多主題混合覆習</option>
+        </select>
+        <div id="themeSelection" style="display: none;">
+            <p>請選擇一個主題：</p>
+            <select id="themeSelect">
+                <option value="">-- 選擇主題 --</option>
+                <option value="body">奇妙的身體</option>
+                <option value="family">相親相愛</option>
+                <option value="food">食物萬花筒</option>
+                <option value="environment">環保大使</option>
+            </select>
+        </div>
+        <div id="multiThemeSelection">
+            <p>請選擇要混合的主題（可多選）：</p>
+            <label><input type="checkbox" value="body"> 妙的身體</label>
+            <label><input type="checkbox" value="family"> 相親相愛</label>
+            <label><input type="checkbox" value="food"> 食物萬花筒</label>
+            <label><input type="checkbox" value="environment"> 環保大使</label>
+        </div>
+        <button id="startButton">開始覆習</button>
+    </div>
+    
+    <div id="reviewSection" style="display: none;">
+        <div id="wordDisplay"></div>
+        <div id="buttons">
+            <button id="hintButton">提示（發音）</button>
+            <button id="correctButton">正確</button>
+            <button id="wrongButton">錯誤</button>
+        </div>
+        <div id="status"></div>
+    </div>
+    
+    <script>
+        // 定義所有主題的詞彙和句子
+        const themes = {
+            body: {
+                words: ['眼睛', '耳朵', '鼻子', '頭髮', '手', '腳', '跳', '男', '女', '長', '短'],
+                sentences: ['我有一雙手。', '我有一雙腳。', '我是男孩子。', '我是女孩子。']
+            },
+            family: {
+                words: ['家', '爸爸', '媽媽', '哥哥', '姐姐', '妹妹', '弟弟', '家務', '愛', '桌子', '椅子', '肥', '瘦'],
+                sentences: ['我愛妹妹。', '我愛爸爸。', '我會抹桌子。']
+            },
+            food: {
+                words: ['三文治', '蔬菜', '魚', '肉', '蛋湯', '超級市場', '甜', '香', '酸', '苦', '早', '午', '晚', '湯匙', '叉', '輕', '重', '快', '慢'],
+                sentences: ['蔬菜真美味。', '蛋真美味。']
+            },
+            environment: {
+                words: ['垃圾筒', '垃圾', '公園', '毛巾', '收拾', '回收', '紙', '玻璃', '分享', '長', '短', '多', '少', '空', '滿'],
+                sentences: ['我把垃圾放進垃圾筒。', '我會用毛巾抹汗。']
+            }
+        };
+
+        let currentItems = []; // 當前覆習項目（詞彙或句子）
+        let currentIndex = 0;
+        let isWordsPhase = true;
+        let errorItems = []; // 錯誤項目列表
+        let isRetryPhase = false; // 是否在重試錯誤項目階段
+        let sentences = []; // 單獨存句子，因為多主題需要
+
+        // 模式選擇事件
+        document.getElementById('modeSelect').addEventListener('change', function() {
+            const mode = this.value;
+            document.getElementById('themeSelection').style.display = mode === 'single' ? 'block' : 'none';
+            document.getElementById('multiThemeSelection').style.display = mode === 'multi' ? 'block' : 'none';
+        });
+
+        // 開始按鈕事件
+        document.getElementById('startButton').addEventListener('click', function() {
+            const mode = document.getElementById('modeSelect').value;
+            if (!mode) {
+                alert('請先選擇覆習模式！');
+                return;
+            }
+
+            let words = [];
+            sentences = [];
+
+            if (mode === 'single') {
+                const selectedTheme = document.getElementById('themeSelect').value;
+                if (!selectedTheme) {
+                    alert('請先選擇一個主題！');
+                    return;
+                }
+                const currentTheme = themes[selectedTheme];
+                words = shuffleArray([...currentTheme.words]);
+                sentences = [...currentTheme.sentences]; // 句子依序
+            } else if (mode === 'multi') {
+                const selectedThemes = Array.from(document.querySelectorAll('#multiThemeSelection input:checked')).map(cb => cb.value);
+                if (selectedThemes.length < 2) {
+                    alert('請至少選擇兩個主題進行混合！');
+                    return;
+                }
+                let allSelectedWords = [];
+                let allSelectedSentences = [];
+                selectedThemes.forEach(themeKey => {
+                    allSelectedWords = allSelectedWords.concat(themes[themeKey].words);
+                    allSelectedSentences = allSelectedSentences.concat(themes[themeKey].sentences);
+                });
+                words = shuffleArray(allSelectedWords).slice(0, 20); // 隨機20個詞彙
+                sentences = shuffleArray(allSelectedSentences).slice(0, 3); // 隨機3個句子
+            }
+
+            currentItems = words;
+            currentIndex = 0;
+            isWordsPhase = true;
+            errorItems = [];
+            isRetryPhase = false;
+            document.getElementById('selectionSection').style.display = 'none';
+            document.getElementById('reviewSection').style.display = 'flex';
+            document.getElementById('correctButton').style.display = 'inline-block';
+            document.getElementById('wrongButton').style.display = 'inline-block';
+            showNextItem(); // 直接顯示第一個
+        });
+
+        // 提示按鈕：發音
+        document.getElementById('hintButton').addEventListener('click', function() {
+            const text = currentItems[currentIndex];
+            speakText(text);
+        });
+
+        // 正確按鈕
+        document.getElementById('correctButton').addEventListener('click', function() {
+            handleResponse(true);
+        });
+
+        // 錯誤按鈕
+        document.getElementById('wrongButton').addEventListener('click', function() {
+            handleResponse(false);
+        });
+
+        // 處理回應
+        function handleResponse(isCorrect) {
+            if (!isCorrect && !isRetryPhase) {
+                errorItems.push(currentItems[currentIndex]);
+            }
+            currentIndex++;
+            showNextItem();
+        }
+
+        // 顯示下一個項目
+        function showNextItem() {
+            if (isRetryPhase) {
+                if (currentIndex < currentItems.length) {
+                    document.getElementById('wordDisplay').textContent = currentItems[currentIndex];
+                    document.getElementById('status').textContent = `錯誤重試中 (${currentIndex + 1}/${currentItems.length})`;
+                } else {
+                    // 重試完成，返回初始畫面
+                    resetToSelection();
+                }
+            } else {
+                if (currentIndex < currentItems.length) {
+                    document.getElementById('wordDisplay').textContent = currentItems[currentIndex];
+                    document.getElementById('status').textContent = isWordsPhase ? `詞彙覆習中 (${currentIndex + 1}/${currentItems.length})` : `句子覆習中 (${currentIndex + 1}/${currentItems.length})`;
+                } else {
+                    if (isWordsPhase) {
+                        // 詞彙結束，切換到句子
+                        isWordsPhase = false;
+                        currentItems = sentences;
+                        currentIndex = 0;
+                        showNextItem();
+                    } else {
+                        // 所有結束，檢查錯誤項目
+                        if (errorItems.length > 0) {
+                            // 進入重試階段
+                            isRetryPhase = true;
+                            currentItems = shuffleArray(errorItems); // 隨機重試錯誤項目
+                            currentIndex = 0;
+                            showNextItem();
+                        } else {
+                            // 無錯誤，返回初始畫面
+                            resetToSelection();
+                        }
+                    }
+                }
+            }
+        }
+
+        // 返回初始畫面
+        function resetToSelection() {
+            document.getElementById('wordDisplay').textContent = '';
+            document.getElementById('status').textContent = '';
+            document.getElementById('reviewSection').style.display = 'none';
+            document.getElementById('selectionSection').style.display = 'block';
+            // 重置選擇
+            document.getElementById('modeSelect').value = '';
+            document.getElementById('themeSelect').value = '';
+            document.getElementById('themeSelection').style.display = 'none';
+            document.getElementById('multiThemeSelection').style.display = 'none';
+            // 清空checkbox
+            document.querySelectorAll('#multiThemeSelection input').forEach(cb => cb.checked = false);
+        }
+
+        // 隨機排序陣列
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 發音函數，使用瀏覽器語音合成
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW'; // 設定為繁體中文（台灣）
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('您的瀏覽器不支援語音發音功能，請檢查設定或更新瀏覽器。');
+            }
+        }
+    </script>
+</body>
+</html>
